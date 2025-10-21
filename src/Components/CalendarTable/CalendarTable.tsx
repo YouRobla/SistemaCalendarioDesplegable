@@ -39,7 +39,7 @@ export const CalendarTable = ({
       className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-lg"
       style={{ whiteSpace: "nowrap" }}
     >
-      <table className="min-w-max w-full border-collapse text-center">
+      <table className="min-w-max w-full border-separate border-spacing-0 text-center">
         <thead className="bg-linear-to-r from-blue-50 to-indigo-50">
           <tr>
             <th className="sticky left-0 z-20 border-r border-gray-100 bg-white/70 p-3 font-semibold text-gray-700 shadow-sm backdrop-blur-md">
@@ -62,7 +62,7 @@ export const CalendarTable = ({
 
         <tbody>
           {rooms.map((room, rowIndex) => (
-            <tr key={rowIndex}>
+            <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50/20'}>
               <td className="sticky left-0 z-20 border-r border-gray-100 bg-white p-2 font-semibold text-gray-700 text-sm">
                 {room}
               </td>

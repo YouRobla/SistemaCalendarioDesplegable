@@ -32,12 +32,12 @@ export const BarSegment = memo(function BarSegment({
 
   return (
     <div
-      className={`absolute top-2 bottom-2 left-0 right-0 cursor-crosshair ${
+      className={`absolute top-2 bottom-2 z-30 cursor-crosshair ${
         isActive ? 'bg-blue-500' : 'bg-emerald-500'
       } ${
-        position === 'head' ? 'rounded-l-full' :
-        position === 'tail' ? 'rounded-r-full' :
-        position === 'single' ? 'rounded-full' : 'rounded-none'
+        position === 'head' ? 'left-2 right-0 rounded-l-full' :
+        position === 'tail' ? 'left-0 right-2 rounded-r-full' :
+        position === 'single' ? 'left-2 right-2 rounded-full' : 'left-0 right-0 rounded-none'
       }`}
       onMouseDown={handleMouseDown}
       onMouseEnter={handleMouseEnter}

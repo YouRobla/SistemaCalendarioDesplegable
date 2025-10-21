@@ -86,7 +86,13 @@ export const useBarStyles = () => {
 
   const getCellClasses = useCallback((room: number, day: number) => {
     const base = 'relative h-12 cursor-crosshair select-none overflow-hidden';
-    return getBarPosition(room, day) ? base : `${base} hover:bg-slate-50`;
+    const hasBar = getBarPosition(room, day);
+    
+    if (hasBar) {
+      return `${base} bg-slate-50/30 border-t border-b border-gray-100`;
+    }
+    
+    return `${base} border border-gray-100 hover:bg-slate-50 transition-colors duration-150`;
   }, [getBarPosition]);
 
   return {
