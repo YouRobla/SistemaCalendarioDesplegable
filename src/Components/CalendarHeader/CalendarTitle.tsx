@@ -5,6 +5,10 @@ interface CalendarTitleProps {
   visibleYear: number;
 }
 
+/**
+ * Título del calendario que muestra el mes/año visibles
+ * con una pequeña animación al cambiar.
+ */
 export const CalendarTitle = ({ visibleMonth, visibleYear }: CalendarTitleProps) => {
   const [displayText, setDisplayText] = useState(`${visibleMonth} ${visibleYear}`);
   const [isAnimating, setIsAnimating] = useState(false);

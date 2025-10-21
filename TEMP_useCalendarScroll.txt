@@ -1,48 +1,44 @@
 import { useEffect, useRef, useState } from "react";
-import type { CalendarDay } from "../utils/calendarHelpers";
 
-/**
- * Hook para manejar el scroll horizontal del calendario y
- * mantener sincronizado el mes/año visibles.
- */
+interface CalendarDay {
+  day: number;
+  weekday: string;
+  month: number;
+  monthName: string;
+  year: number;
+}
+
 export const useCalendarScroll = (allDays: CalendarDay[], today: Date) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [visibleMonth, setVisibleMonth] = useState("");
   const [visibleYear, setVisibleYear] = useState(0);
-  const tickingRef = useRef(false); // throttle con requestAnimationFrame
-  const COLUMN_WIDTH = 85; // ancho fijo por día (px)
 
   // Actualiza el mes visible al hacer scroll
   useEffect(() => {
-    const onScroll = () => {
+    const handleScroll = () => {
       const container = containerRef.current;
       if (!container) return;
 
-      if (!tickingRef.current) {
-        tickingRef.current = true;
-        requestAnimationFrame(() => {
-          const scrollLeft = container.scrollLeft;
-          // Usar la PRIMERA columna completamente visible para decidir el mes visible
-          const firstVisibleIndex = Math.floor(scrollLeft / COLUMN_WIDTH);
-          const index = Math.max(0, Math.min(firstVisibleIndex, allDays.length - 1));
-          const monthData = allDays[index] || allDays[0];
+      const scrollLeft = container.scrollLeft;
+      const columnWidth = 85;
+      const centerPosition = scrollLeft + (container.clientWidth / 2);
+      const index = Math.floor(centerPosition / columnWidth);
+      const monthData = allDays[index] || allDays[0];
 
-          if (monthData) {
-            setVisibleMonth((prev) => (prev !== monthData.monthName ? monthData.monthName : prev));
-            setVisibleYear((prev) => (prev !== monthData.year ? monthData.year : prev));
-          }
-
-          tickingRef.current = false;
-        });
+      if (monthData) {
+        if (monthData.monthName !== visibleMonth || monthData.year !== visibleYear) {
+          setVisibleMonth(monthData.monthName);
+          setVisibleYear(monthData.year);
+        }
       }
     };
 
     const container = containerRef.current;
-    container?.addEventListener("scroll", onScroll, { passive: true });
+    container?.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
-      container?.removeEventListener("scroll", onScroll);
+      container?.removeEventListener("scroll", handleScroll);
     };
-  }, [allDays]);
+  }, [allDays, visibleMonth, visibleYear]);
 
   // Posicionarse automáticamente en el día actual SOLO al montar
   useEffect(() => {
@@ -60,7 +56,7 @@ export const useCalendarScroll = (allDays: CalendarDay[], today: Date) => {
       );
 
       if (todayIndex !== -1) {
-        const scrollX = todayIndex * COLUMN_WIDTH;
+        const scrollX = todayIndex * 85;
         container.scrollLeft = scrollX;
         
         setTimeout(() => {
@@ -75,7 +71,7 @@ export const useCalendarScroll = (allDays: CalendarDay[], today: Date) => {
 
     const timeoutId = setTimeout(initializeScroll, 200);
     return () => clearTimeout(timeoutId);
-  }, [allDays, today]);
+  }, []);
 
   const scrollToToday = () => {
     const container = containerRef.current;
@@ -89,7 +85,7 @@ export const useCalendarScroll = (allDays: CalendarDay[], today: Date) => {
     );
 
     if (todayIndex !== -1) {
-      const scrollX = todayIndex * COLUMN_WIDTH;
+      const scrollX = todayIndex * 85;
       container.scrollTo({ left: scrollX, behavior: "smooth" });
       
       setTimeout(() => {
@@ -112,13 +108,8 @@ export const useCalendarScroll = (allDays: CalendarDay[], today: Date) => {
 
     if (selectedDate) {
       const index = allDays.indexOf(selectedDate);
-      const scrollX = index * COLUMN_WIDTH;
+      const scrollX = index * 85;
       container.scrollTo({ left: scrollX, behavior: "smooth" });
-      // Actualizar el encabezado luego del desplazamiento
-      setTimeout(() => {
-        setVisibleMonth(selectedDate.monthName);
-        setVisibleYear(selectedDate.year);
-      }, 250);
     }
   };
 
@@ -132,3 +123,4 @@ export const useCalendarScroll = (allDays: CalendarDay[], today: Date) => {
     scrollToDate
   };
 };
+
