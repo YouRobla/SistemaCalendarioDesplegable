@@ -33,7 +33,7 @@ export const CalendarTable = ({
 }: CalendarTableProps) => {
   const { 
     getCellClasses, 
-    getBarInnerClasses,
+    getBarInfo,
     startSelection, 
     updateSelection, 
     endSelection
@@ -78,7 +78,7 @@ export const CalendarTable = ({
                   rowIndex={rowIndex}
                   dayIndex={dayIndex}
                   cellClasses={getCellClasses(rowIndex, dayIndex)}
-                  barInnerClasses={getBarInnerClasses(rowIndex, dayIndex)}
+                  barInfo={getBarInfo(rowIndex, dayIndex)}
                   onMouseDown={startSelection}
                   onMouseEnter={updateSelection}
                   onMouseUp={endSelection}

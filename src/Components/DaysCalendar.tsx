@@ -1,10 +1,15 @@
 import { memo } from "react";
+import { BarSegment } from "./BarSegment";
 
 interface DaysCalendarProps {
   rowIndex: number;
   dayIndex: number;
   cellClasses: string;
-  barInnerClasses: string;
+  barInfo: {
+    position: 'head' | 'body' | 'tail' | 'single';
+    isActive: boolean;
+    barId?: string;
+  } | null;
   onMouseDown: (rowIndex: number, dayIndex: number) => void;
   onMouseEnter: (rowIndex: number, dayIndex: number) => void;
   onMouseUp: () => void;
@@ -17,7 +22,7 @@ export const DaysCalendar = memo(function DaysCalendar({
   rowIndex,
   dayIndex,
   cellClasses,
-  barInnerClasses,
+  barInfo,
   onMouseDown,
   onMouseEnter,
   onMouseUp,
@@ -42,8 +47,16 @@ export const DaysCalendar = memo(function DaysCalendar({
       onMouseEnter={handleMouseEnter}
       onMouseUp={onMouseUp}
     >
-      {barInnerClasses && (
-        <div className={barInnerClasses} />
+      {barInfo && (
+        <BarSegment
+          roomIndex={rowIndex}
+          dayIndex={dayIndex}
+          isActive={barInfo.isActive}
+          position={barInfo.position}
+          onMouseDown={onMouseDown}
+          onMouseEnter={onMouseEnter}
+          onMouseUp={onMouseUp}
+        />
       )}
     </td>
   );

@@ -1,186 +1,134 @@
 import { useState, useCallback } from 'react';
 
-export interface BarData {
+/**
+ * Interfaz para una barra individual en el calendario
+ */
+interface Bar {
   id: string;
-  roomIndex: number;
-  startDay: number;
-  endDay: number;
-}
-
-export interface SelectionState {
-  isSelecting: boolean;
-  startRoom: number | null;
-  startDay: number | null;
-  currentRoom: number | null;
-  currentDay: number | null;
+  room: number;
+  start: number;
+  end: number;
 }
 
 /**
- * Hook para manejar barras continuas dinámicas en el calendario.
+ * Hook para manejar barras continuas en el calendario.
  * Permite crear barras arrastrando y seleccionando celdas.
+ * Cada barra es un componente individual con lógica independiente.
  */
 export const useBarStyles = () => {
-  const [bars, setBars] = useState<BarData[]>([]);
-  const [selection, setSelection] = useState<SelectionState>({
-    isSelecting: false,
-    startRoom: null,
-    startDay: null,
-    currentRoom: null,
-    currentDay: null,
-  });
+  // Estado de las barras creadas
+  const [bars, setBars] = useState<Bar[]>([]);
+  
+  // Estado de la selección activa
+  const [selection, setSelection] = useState<{
+    active: boolean;
+    room: number | null;
+    start: number | null;
+    end: number | null;
+  }>({ active: false, room: null, start: null, end: null });
 
   /**
-   * Inicia la selección de una barra
+   * Inicia una nueva selección de barra
+   * @param room - Índice de la habitación
+   * @param day - Índice del día
    */
-  const startSelection = useCallback((roomIndex: number, dayIndex: number) => {
-    setSelection({
-      isSelecting: true,
-      startRoom: roomIndex,
-      startDay: dayIndex,
-      currentRoom: roomIndex,
-      currentDay: dayIndex,
-    });
+  const startSelection = useCallback((room: number, day: number) => {
+    setSelection({ active: true, room, start: day, end: day });
   }, []);
 
-  /**
-   * Actualiza la selección mientras se arrastra
-   */
-  const updateSelection = useCallback((roomIndex: number, dayIndex: number) => {
-    if (!selection.isSelecting) return;
-    
-    setSelection(prev => ({
-      ...prev,
-      currentRoom: roomIndex,
-      currentDay: dayIndex,
-    }));
-  }, [selection.isSelecting]);
+  const updateSelection = useCallback((_room: number, day: number) => {
+    if (!selection.active) return;
+    setSelection(prev => ({ ...prev, end: day }));
+  }, [selection.active]);
 
   /**
    * Finaliza la selección y crea la barra
    */
   const endSelection = useCallback(() => {
-    if (!selection.isSelecting) {
-      setSelection({
-        isSelecting: false,
-        startRoom: null,
-        startDay: null,
-        currentRoom: null,
-        currentDay: null,
-      });
+    if (!selection.active || selection.room === null || selection.start === null || selection.end === null) {
+      setSelection({ active: false, room: null, start: null, end: null });
       return;
     }
 
-    // Solo crear barra si está en la misma fila y tenemos valores válidos
-    if (selection.startRoom === selection.currentRoom && 
-        selection.startDay !== null && 
-        selection.currentDay !== null) {
-      const startDay = Math.min(selection.startDay, selection.currentDay);
-      const endDay = Math.max(selection.startDay, selection.currentDay);
-      
-      const newBar: BarData = {
-        id: `bar-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        roomIndex: selection.startRoom!,
-        startDay,
-        endDay,
-      };
-
-      setBars(prev => [...prev, newBar]);
-    }
-
-    setSelection({
-      isSelecting: false,
-      startRoom: null,
-      startDay: null,
-      currentRoom: null,
-      currentDay: null,
-    });
+    const start = Math.min(selection.start, selection.end);
+    const end = Math.max(selection.start, selection.end);
+    
+    const newBar: Bar = {
+      id: `bar-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      room: selection.room,
+      start,
+      end,
+    };
+    
+    setBars(prev => [...prev, newBar]);
+    setSelection({ active: false, room: null, start: null, end: null });
   }, [selection]);
 
   /**
-   * Obtiene la posición de una celda dentro de una barra
+   * Determina la posición de una celda dentro de una barra
+   * @param room - Índice de la habitación
+   * @param day - Índice del día
+   * @returns Posición de la celda: 'head', 'body', 'tail', 'single' o null
    */
-  const getBarPosition = useCallback((roomIndex: number, dayIndex: number): 'head' | 'body' | 'tail' | 'single' | null => {
+  const getBarPosition = useCallback((room: number, day: number) => {
     // Verificar selección activa
-    if (selection.isSelecting && 
-        selection.startRoom === roomIndex && 
-        selection.startDay !== null && 
-        selection.currentDay !== null) {
-      const startDay = Math.min(selection.startDay, selection.currentDay);
-      const endDay = Math.max(selection.startDay, selection.currentDay);
-      
-      if (dayIndex >= startDay && dayIndex <= endDay) {
-        if (startDay === endDay) return 'single';
-        if (dayIndex === startDay) return 'head';
-        if (dayIndex === endDay) return 'tail';
+    if (selection.active && selection.room === room && selection.start && selection.end) {
+      const start = Math.min(selection.start, selection.end);
+      const end = Math.max(selection.start, selection.end);
+      if (day >= start && day <= end) {
+        if (start === end) return 'single';
+        if (day === start) return 'head';
+        if (day === end) return 'tail';
         return 'body';
       }
     }
 
     // Verificar barras existentes
-    const bar = bars.find(b => 
-      b.roomIndex === roomIndex && 
-      dayIndex >= b.startDay && 
-      dayIndex <= b.endDay
-    );
-
+    const bar = bars.find(b => b.room === room && day >= b.start && day <= b.end);
     if (!bar) return null;
 
-    if (bar.startDay === bar.endDay) return 'single';
-    if (dayIndex === bar.startDay) return 'head';
-    if (dayIndex === bar.endDay) return 'tail';
+    if (bar.start === bar.end) return 'single';
+    if (day === bar.start) return 'head';
+    if (day === bar.end) return 'tail';
     return 'body';
   }, [bars, selection]);
 
   /**
-   * Obtiene las clases CSS para una celda según su posición en la barra
+   * Obtiene información completa de una barra para un segmento específico
+   * @param room - Índice de la habitación
+   * @param day - Índice del día
+   * @returns Información de la barra o null si no hay barra
    */
-  const getCellClasses = useCallback((roomIndex: number, dayIndex: number): string => {
-    const baseClasses = 'relative h-12 cursor-crosshair select-none overflow-hidden transition-all duration-200';
-    const barPosition = getBarPosition(roomIndex, dayIndex);
-    
-    if (!barPosition) {
-      return `${baseClasses} hover:bg-slate-100`;
-    }
+  const getBarInfo = useCallback((room: number, day: number) => {
+    const position = getBarPosition(room, day);
+    if (!position) return null;
 
-    // Para barras, solo aplicar las clases base
-    return `${baseClasses}`;
-  }, [getBarPosition]);
+    // Verificar si esta celda está en la selección activa
+    const isInActiveSelection = selection.active && 
+      selection.room === room && 
+      selection.start !== null && 
+      selection.end !== null &&
+      day >= Math.min(selection.start, selection.end) &&
+      day <= Math.max(selection.start, selection.end);
 
-  /**
-   * Obtiene las clases para el elemento interno de la barra
-   */
-  const getBarInnerClasses = useCallback((roomIndex: number, dayIndex: number): string => {
-    const barPosition = getBarPosition(roomIndex, dayIndex);
-    
-    if (!barPosition) {
-      return '';
-    }
-
-    // Colores constantes sin gradientes
-    const colorClass = selection.isSelecting ? 'bg-blue-500' : 'bg-green-500';
-    
-    // Estilos según la posición en la barra
-    const positionClasses = {
-      head: 'rounded-l-full', // Solo borde izquierdo redondeado
-      body: 'rounded-none', // Sin bordes redondeados
-      tail: 'rounded-r-full', // Solo borde derecho redondeado
-      single: 'rounded-full' // Todos los bordes redondeados
+    return {
+      position: position as 'head' | 'body' | 'tail' | 'single',
+      isActive: isInActiveSelection,
+      barId: bars.find(b => b.room === room && day >= b.start && day <= b.end)?.id
     };
+  }, [getBarPosition, selection, bars]);
 
-    // Posicionamiento con separación real - no usar inset-0
-    const positioningClasses = 'absolute top-2 bottom-2 left-0 right-0'; // Separación vertical real
-    
-    // Efectos visuales mejorados
-    const visualEffects = 'shadow-sm transition-all duration-200 hover:shadow-md';
-    
-    return `${positioningClasses} ${colorClass} ${positionClasses[barPosition]} ${visualEffects}`;
-  }, [getBarPosition, selection.isSelecting]);
+  const getCellClasses = useCallback((room: number, day: number) => {
+    const base = 'relative h-12 cursor-crosshair select-none overflow-hidden';
+    return getBarPosition(room, day) ? base : `${base} hover:bg-slate-50`;
+  }, [getBarPosition]);
 
   return {
     getCellClasses,
-    getBarInnerClasses,
+    getBarInfo,
     startSelection,
     updateSelection,
-    endSelection
+    endSelection,
+    bars
   };
 };
