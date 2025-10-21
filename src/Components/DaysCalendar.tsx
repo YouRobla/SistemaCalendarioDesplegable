@@ -8,16 +8,12 @@ interface DaysCalendarProps {
   barInfo: {
     position: 'head' | 'body' | 'tail' | 'single';
     isActive: boolean;
-    barId?: string;
   } | null;
   onMouseDown: (rowIndex: number, dayIndex: number) => void;
   onMouseEnter: (rowIndex: number, dayIndex: number) => void;
   onMouseUp: () => void;
 }
 
-/**
- * Celda del calendario con soporte para barras continuas dinámicas.
- */
 export const DaysCalendar = memo(function DaysCalendar({
   rowIndex,
   dayIndex,
@@ -41,8 +37,6 @@ export const DaysCalendar = memo(function DaysCalendar({
   return (
     <td
       className={cellClasses}
-      role="gridcell"
-      aria-colindex={dayIndex + 2}
       onMouseDown={handleMouseDown}
       onMouseEnter={handleMouseEnter}
       onMouseUp={onMouseUp}

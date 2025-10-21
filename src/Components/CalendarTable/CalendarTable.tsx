@@ -11,12 +11,6 @@ interface CalendarTableProps {
   rooms?: string[];
 }
 
-/**
- * Tabla principal del calendario.
- * - Cabecera con días del período
- * - Cuerpo con filas por habitación
- * - Selección de rangos mediante hook especializado
- */
 export const CalendarTable = ({
   containerRef,
   allDays,
@@ -48,7 +42,7 @@ export const CalendarTable = ({
       <table className="min-w-max w-full border-collapse text-center">
         <thead className="bg-linear-to-r from-blue-50 to-indigo-50">
           <tr>
-            <th className="sticky left-0 border-r border-gray-100 bg-white/70 p-3 font-semibold text-gray-700 shadow-sm backdrop-blur-md">
+            <th className="sticky left-0 z-20 border-r border-gray-100 bg-white/70 p-3 font-semibold text-gray-700 shadow-sm backdrop-blur-md">
               Habitaciones
             </th>
             {allDays.map(({ day, weekday, month, monthName, year }, index) => (
@@ -68,8 +62,8 @@ export const CalendarTable = ({
 
         <tbody>
           {rooms.map((room, rowIndex) => (
-            <tr key={rowIndex} className="relative">
-              <td className="sticky left-0 border-r border-gray-100 bg-white p-2 font-semibold text-gray-700 text-sm">
+            <tr key={rowIndex}>
+              <td className="sticky left-0 z-20 border-r border-gray-100 bg-white p-2 font-semibold text-gray-700 text-sm">
                 {room}
               </td>
               {allDays.map((_, dayIndex) => (

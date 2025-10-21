@@ -1,8 +1,5 @@
 import { useState, useCallback } from 'react';
 
-/**
- * Interfaz para una barra individual en el calendario
- */
 interface Bar {
   id: string;
   room: number;
@@ -10,16 +7,8 @@ interface Bar {
   end: number;
 }
 
-/**
- * Hook para manejar barras continuas en el calendario.
- * Permite crear barras arrastrando y seleccionando celdas.
- * Cada barra es un componente individual con lógica independiente.
- */
 export const useBarStyles = () => {
-  // Estado de las barras creadas
   const [bars, setBars] = useState<Bar[]>([]);
-  
-  // Estado de la selección activa
   const [selection, setSelection] = useState<{
     active: boolean;
     room: number | null;
@@ -27,11 +16,6 @@ export const useBarStyles = () => {
     end: number | null;
   }>({ active: false, room: null, start: null, end: null });
 
-  /**
-   * Inicia una nueva selección de barra
-   * @param room - Índice de la habitación
-   * @param day - Índice del día
-   */
   const startSelection = useCallback((room: number, day: number) => {
     setSelection({ active: true, room, start: day, end: day });
   }, []);
@@ -41,9 +25,6 @@ export const useBarStyles = () => {
     setSelection(prev => ({ ...prev, end: day }));
   }, [selection.active]);
 
-  /**
-   * Finaliza la selección y crea la barra
-   */
   const endSelection = useCallback(() => {
     if (!selection.active || selection.room === null || selection.start === null || selection.end === null) {
       setSelection({ active: false, room: null, start: null, end: null });
@@ -64,14 +45,7 @@ export const useBarStyles = () => {
     setSelection({ active: false, room: null, start: null, end: null });
   }, [selection]);
 
-  /**
-   * Determina la posición de una celda dentro de una barra
-   * @param room - Índice de la habitación
-   * @param day - Índice del día
-   * @returns Posición de la celda: 'head', 'body', 'tail', 'single' o null
-   */
   const getBarPosition = useCallback((room: number, day: number) => {
-    // Verificar selección activa
     if (selection.active && selection.room === room && selection.start && selection.end) {
       const start = Math.min(selection.start, selection.end);
       const end = Math.max(selection.start, selection.end);
@@ -83,7 +57,6 @@ export const useBarStyles = () => {
       }
     }
 
-    // Verificar barras existentes
     const bar = bars.find(b => b.room === room && day >= b.start && day <= b.end);
     if (!bar) return null;
 
@@ -93,17 +66,10 @@ export const useBarStyles = () => {
     return 'body';
   }, [bars, selection]);
 
-  /**
-   * Obtiene información completa de una barra para un segmento específico
-   * @param room - Índice de la habitación
-   * @param day - Índice del día
-   * @returns Información de la barra o null si no hay barra
-   */
   const getBarInfo = useCallback((room: number, day: number) => {
     const position = getBarPosition(room, day);
     if (!position) return null;
 
-    // Verificar si esta celda está en la selección activa
     const isInActiveSelection = selection.active && 
       selection.room === room && 
       selection.start !== null && 
@@ -128,7 +94,6 @@ export const useBarStyles = () => {
     getBarInfo,
     startSelection,
     updateSelection,
-    endSelection,
-    bars
+    endSelection
   };
 };
