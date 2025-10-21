@@ -32,7 +32,7 @@ export const BarSegment = memo(function BarSegment({
 
   return (
     <div
-      className={`absolute top-2 bottom-2 z-30 cursor-crosshair ${
+      className={`absolute top-2 bottom-2 z-10 cursor-crosshair ${
         isActive ? 'bg-blue-500' : 'bg-emerald-500'
       } ${
         position === 'head' ? 'left-2 right-0 rounded-l-full' :
