@@ -1,0 +1,125 @@
+import { useEffect, useRef, useState } from "react";
+
+interface CalendarDay {
+  day: number;
+  weekday: string;
+  month: number;
+  monthName: string;
+  year: number;
+}
+
+export const useCalendarScroll = (allDays: CalendarDay[], today: Date) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [visibleMonth, setVisibleMonth] = useState("");
+  const [visibleYear, setVisibleYear] = useState(0);
+
+  // Actualiza el mes visible al hacer scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      const container = containerRef.current;
+      if (!container) return;
+
+      const scrollLeft = container.scrollLeft;
+      const columnWidth = 85;
+      const centerPosition = scrollLeft + (container.clientWidth / 2);
+      const index = Math.floor(centerPosition / columnWidth);
+      const monthData = allDays[index] || allDays[0];
+
+      if (monthData) {
+        if (monthData.monthName !== visibleMonth || monthData.year !== visibleYear) {
+          setVisibleMonth(monthData.monthName);
+          setVisibleYear(monthData.year);
+        }
+      }
+    };
+
+    const container = containerRef.current;
+    container?.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      container?.removeEventListener("scroll", handleScroll);
+    };
+  }, [allDays, visibleMonth, visibleYear]);
+
+  // Posicionarse automáticamente en el día actual SOLO al montar
+  useEffect(() => {
+    if (allDays.length === 0) return;
+    
+    const initializeScroll = () => {
+      const container = containerRef.current;
+      if (!container) return;
+
+      const todayIndex = allDays.findIndex(
+        (d) =>
+          d.day === today.getDate() &&
+          d.month === today.getMonth() &&
+          d.year === today.getFullYear()
+      );
+
+      if (todayIndex !== -1) {
+        const scrollX = todayIndex * 85;
+        container.scrollLeft = scrollX;
+        
+        setTimeout(() => {
+          const monthData = allDays[todayIndex];
+          if (monthData) {
+            setVisibleMonth(monthData.monthName);
+            setVisibleYear(monthData.year);
+          }
+        }, 50);
+      }
+    };
+
+    const timeoutId = setTimeout(initializeScroll, 200);
+    return () => clearTimeout(timeoutId);
+  }, []);
+
+  const scrollToToday = () => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const todayIndex = allDays.findIndex(
+      (d) =>
+        d.day === today.getDate() &&
+        d.month === today.getMonth() &&
+        d.year === today.getFullYear()
+    );
+
+    if (todayIndex !== -1) {
+      const scrollX = todayIndex * 85;
+      container.scrollTo({ left: scrollX, behavior: "smooth" });
+      
+      setTimeout(() => {
+        const monthData = allDays[todayIndex];
+        if (monthData) {
+          setVisibleMonth(monthData.monthName);
+          setVisibleYear(monthData.year);
+        }
+      }, 300);
+    }
+  };
+
+  const scrollToDate = (month: number, day: number, year: number) => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const selectedDate = allDays.find(
+      (d) => d.month === month && d.day === day && d.year === year
+    );
+
+    if (selectedDate) {
+      const index = allDays.indexOf(selectedDate);
+      const scrollX = index * 85;
+      container.scrollTo({ left: scrollX, behavior: "smooth" });
+    }
+  };
+
+  return {
+    containerRef,
+    visibleMonth,
+    visibleYear,
+    setVisibleMonth,
+    setVisibleYear,
+    scrollToToday,
+    scrollToDate
+  };
+};
