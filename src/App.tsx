@@ -1,12 +1,19 @@
 
 import './App.css'
+
+import {
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query'
+
 import { YearlyScrollableCalendar } from './Components/YearlyScrollableCalendar'
 
 function App() {
+  const queryClient = new QueryClient()
   return (
-    <div>
+    <QueryClientProvider client={queryClient}>
       <YearlyScrollableCalendar />
-    </div>
+  </QueryClientProvider>
   )
 }
 

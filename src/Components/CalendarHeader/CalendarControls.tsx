@@ -31,7 +31,7 @@ export const CalendarControls = ({
   };
 
   return (
-    <div className="mt-4 flex flex-wrap items-center justify-between gap-4 px-2">
+    <div className="flex items-center gap-4">
       {/* Botón Hoy */}
       <button
         onClick={onScrollToToday}
