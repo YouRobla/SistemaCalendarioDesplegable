@@ -63,17 +63,17 @@ export const useCalendarScroll = (allDays: CalendarDay[], today: Date) => {
         const scrollX = todayIndex * COLUMN_WIDTH;
         container.scrollLeft = scrollX;
         
-        setTimeout(() => {
-          const monthData = allDays[todayIndex];
-          if (monthData) {
-            setVisibleMonth(monthData.monthName);
-            setVisibleYear(monthData.year);
-          }
-        }, 50);
+        // Actualizar inmediatamente el estado visible
+        const monthData = allDays[todayIndex];
+        if (monthData) {
+          setVisibleMonth(monthData.monthName);
+          setVisibleYear(monthData.year);
+        }
       }
     };
 
-    const timeoutId = setTimeout(initializeScroll, 200);
+    // Reducir delay para que cargue más rápido
+    const timeoutId = setTimeout(initializeScroll, 50);
     return () => clearTimeout(timeoutId);
   }, [allDays, today]);
 

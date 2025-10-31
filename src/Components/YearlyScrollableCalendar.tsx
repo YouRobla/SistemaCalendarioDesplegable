@@ -22,6 +22,19 @@ export const YearlyScrollableCalendar = () => {
     queryFn: getHotelRooms,
   });
 
+  // 📊 Log del número de habitaciones recibidas
+  useEffect(() => {
+    if (HotelRooms && HotelRooms.length > 0) {
+      console.log(`🏨 Total de habitaciones cargadas: ${HotelRooms.length}`);
+      console.log('📋 Lista de habitaciones:', HotelRooms.map(room => ({
+        id: room.id,
+        name: room.name
+      })));
+    } else if (HotelRooms && HotelRooms.length === 0) {
+      console.warn('⚠️ No se recibieron habitaciones del backend (array vacío)');
+    }
+  }, [HotelRooms]);
+
   // Hook personalizado para manejar el scroll y el mes/año visibles
   const {
     containerRef,
@@ -39,7 +52,9 @@ export const YearlyScrollableCalendar = () => {
 
   // Inicializar encabezado visible al montar
   useEffect(() => {
-    setVisibleMonth(months[today.getMonth()]);
+    // Inicializar directamente con el mes actual para evitar cambios innecesarios
+    const currentMonth = months[today.getMonth()];
+    setVisibleMonth(currentMonth);
     setVisibleYear(startYear);
   }, [setVisibleMonth, setVisibleYear, startYear, today]);
 

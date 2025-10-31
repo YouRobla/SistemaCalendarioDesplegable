@@ -1,14 +1,9 @@
 import { memo } from "react";
-import { BarSegment } from "./BarSegment";
 
 interface DaysCalendarProps {
   rowIndex: number;
   dayIndex: number;
   cellClasses: string;
-  barInfo: {
-    position: 'head' | 'body' | 'tail' | 'single';
-    isActive: boolean;
-  } | null;
   onMouseDown: (rowIndex: number, dayIndex: number) => void;
   onMouseEnter: (rowIndex: number, dayIndex: number) => void;
   onMouseUp: () => void;
@@ -18,40 +13,37 @@ export const DaysCalendar = memo(function DaysCalendar({
   rowIndex,
   dayIndex,
   cellClasses,
-  barInfo,
   onMouseDown,
   onMouseEnter,
   onMouseUp,
 }: DaysCalendarProps) {
-  const handleMouseDown = (event: React.MouseEvent<HTMLTableCellElement>) => {
+  const handleMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
     event.preventDefault();
     onMouseDown(rowIndex, dayIndex);
   };
 
-  const handleMouseEnter = (event: React.MouseEvent<HTMLTableCellElement>) => {
+  const handleMouseEnter = (event: React.MouseEvent<HTMLDivElement>) => {
     if (event.buttons === 1) {
       onMouseEnter(rowIndex, dayIndex);
     }
   };
 
   return (
-    <td
+    <div
       className={cellClasses}
       onMouseDown={handleMouseDown}
       onMouseEnter={handleMouseEnter}
       onMouseUp={onMouseUp}
-    >
-      {barInfo && (
-        <BarSegment
-          roomIndex={rowIndex}
-          dayIndex={dayIndex}
-          isActive={barInfo.isActive}
-          position={barInfo.position}
-          onMouseDown={onMouseDown}
-          onMouseEnter={onMouseEnter}
-          onMouseUp={onMouseUp}
-        />
-      )}
-    </td>
+      style={{
+        outline: 'none',
+        boxShadow: 'none',
+      }}
+    />
+  );
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.rowIndex === nextProps.rowIndex &&
+    prevProps.dayIndex === nextProps.dayIndex &&
+    prevProps.cellClasses === nextProps.cellClasses
   );
 });

@@ -15,18 +15,24 @@ export interface HotelRoom {
 
 export const getHotelRooms = async (): Promise<HotelRoom[]> => {
   try {
-    console.log('🔄 Fetching hotel rooms...');
     const response = await api.get('/api/hotel/cuartos');
     const apiData = response.data;
     
-    console.log('📊 API Response:', apiData);
+    // 📊 Log de la respuesta completa del backend
+    console.log('📥 Respuesta del backend (hotel/cuartos):', {
+      fullResponse: response.data,
+      success: apiData.success,
+      dataType: Array.isArray(apiData.data) ? 'array' : typeof apiData.data,
+      dataLength: Array.isArray(apiData.data) ? apiData.data.length : 'N/A',
+      rawData: apiData.data
+    });
     
     if (apiData.success && Array.isArray(apiData.data)) {
-      console.log(`✅ Found ${apiData.data.length} hotel rooms`);
+      console.log(`✅ Habitaciones recibidas del backend: ${apiData.data.length} habitaciones`);
       return apiData.data;
     }
     
-    console.log('❌ Invalid API response format');
+    console.warn('⚠️ La respuesta del backend no tiene el formato esperado:', apiData);
     return [];
   } catch (error) {
     console.error('❌ Error fetching hotel rooms:', error);

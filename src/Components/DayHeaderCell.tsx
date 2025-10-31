@@ -37,29 +37,28 @@ export const DayHeaderCell = memo(function DayHeaderCell({
   const monthStartClass = day === 1 ? "border-l-4 border-indigo-200" : "border-l border-gray-100";
 
   return (
-    <th
+    <div
       key={index}
-      className={`p-3 min-w-[85px] transition-colors duration-150 ${bgClass} ${monthStartClass} ${!isToday ? 'hover:bg-blue-100' : ''} ${isToday ? 'hover:from-blue-600 hover:to-indigo-700' : ''} overflow-hidden`}
+      className={`p-3 min-w-[85px] h-20 transition-colors duration-150 ${bgClass} ${monthStartClass} ${!isToday ? 'hover:bg-blue-100' : ''} ${isToday ? 'hover:from-blue-600 hover:to-indigo-700' : ''} overflow-hidden flex flex-col justify-center items-center text-center`}
       title={`${day} ${monthName} ${year}`}
     >
-      <div className={`font-medium ${isToday ? 'text-white' : 'text-gray-700'}`}>
-        <span className={`text-lg font-bold ${isToday ? 'text-white' : ''}`}>{day}</span>
-        <span className={`block text-xs font-semibold mt-1 ${isToday ? 'text-blue-100' : 'text-gray-500'}`}>
+      <div className={`font-medium flex flex-col items-center justify-center ${isToday ? 'text-white' : 'text-gray-700'}`}>
+        <span className={`text-lg font-bold leading-tight ${isToday ? 'text-white' : ''}`}>{day}</span>
+        <span className={`text-xs font-semibold leading-tight ${isToday ? 'text-blue-100' : 'text-gray-500'}`}>
           {weekday}
         </span>
         {day === 1 && !isToday && (
-          <span className="inline-block text-[10px] text-indigo-500 font-semibold mt-1">{monthName}</span>
+          <span className="text-[10px] text-indigo-500 font-semibold leading-tight">{monthName}</span>
         )}
-        {isToday && (
-          <span className="block text-[10px] text-blue-200 font-medium mt-0.5">HOY</span>
-        )}
-        {!isToday && (
-          <span className="block text-[10px] text-gray-400 mt-0.5">
+        {isToday ? (
+          <span className="text-[10px] text-blue-200 font-medium leading-tight">HOY</span>
+        ) : (
+          <span className="text-[10px] text-gray-400 leading-tight">
             {monthName.slice(0, 3)} {year}
           </span>
         )}
       </div>
-    </th>
+    </div>
   );
 });
 
