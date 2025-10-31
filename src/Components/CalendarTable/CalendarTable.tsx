@@ -1,4 +1,4 @@
-import { type RefObject } from "react";
+import { type RefObject, useRef, useEffect } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { DayHeaderCell } from "../DayHeaderCell";
 import { DaysCalendar } from "../DaysCalendar";
@@ -35,7 +35,10 @@ export const CalendarTable = ({
   const maxVisibleHeight = Math.min(totalHeight, window.innerHeight * 0.7); // Máximo 70vh
   const needsVerticalScroll = totalHeight > maxVisibleHeight;
 
-  // Virtualización horizontal de columnas (días) con @tanstack/react-virtual
+  // Ref para el contenedor de scroll vertical
+  const verticalScrollRef = useRef<HTMLDivElement>(null);
+
+  // Virtualización horizontal de columnas (días)
   const columnVirtualizer = useVirtualizer({
     count: allDays.length,
     getScrollElement: () => containerRef.current,
@@ -44,8 +47,32 @@ export const CalendarTable = ({
     overscan: 3,
   });
 
+  // Virtualización vertical de filas (habitaciones)
+  const rowVirtualizer = useVirtualizer({
+    count: rooms.length,
+    getScrollElement: () => verticalScrollRef.current,
+    estimateSize: () => 80,
+    overscan: 2,
+  });
+
+  // Log para verificar virtualización
+  useEffect(() => {
+    const visibleRows = rowVirtualizer.getVirtualItems().length;
+    const visibleCols = columnVirtualizer.getVirtualItems().length;
+    const totalCells = visibleRows * visibleCols;
+    const totalPossibleCells = rooms.length * allDays.length;
+    const reduction = ((1 - totalCells / totalPossibleCells) * 100).toFixed(1);
+    
+    console.log(`🚀 Virtualización activa:`);
+    console.log(`  📊 Filas visibles: ${visibleRows} de ${rooms.length} habitaciones`);
+    console.log(`  📊 Columnas visibles: ${visibleCols} de ${allDays.length} días`);
+    console.log(`  📊 Celdas renderizadas: ${totalCells} de ${totalPossibleCells} posibles`);
+    console.log(`  ✅ Reducción de renderizado: ${reduction}%`);
+  }, [rooms.length, allDays.length, rowVirtualizer, columnVirtualizer]);
+
   return (
     <div 
+      ref={verticalScrollRef}
       className="rounded-2xl border border-gray-100 bg-white shadow-lg flex flex-col"
       style={{ 
         maxHeight: needsVerticalScroll ? `${maxVisibleHeight}px` : 'none',
@@ -54,25 +81,38 @@ export const CalendarTable = ({
       }}
     >
       {/* Contenedor principal con scroll vertical compartido */}
-      <div className="flex shrink-0" style={{ minHeight: `${totalHeight}px` }}>
-        {/* Columna fija de Habitaciones (NO tiene scroll propio, se mueve con el scroll principal) */}
+      <div className="flex shrink-0" style={{ height: `${rowVirtualizer.getTotalSize() + 80}px`, position: 'relative' }}>
+        {/* Columna fija de Habitaciones (virtualizada verticalmente) */}
         <div 
-          className="shrink-0 border-r border-gray-200 bg-gray-50"
-          style={{ width: '150px', height: `${totalHeight}px` }}
+          className="shrink-0 border-r border-gray-200 bg-gray-50 sticky left-0"
+          style={{ width: '150px', height: `${rowVirtualizer.getTotalSize() + 80}px` }}
         >
-          {/* Header de Habitaciones - sticky para que no se mueva con scroll vertical */}
+          {/* Header de Habitaciones - sticky */}
           <div className="sticky top-0 z-40 bg-gray-50 border-b border-gray-200 h-20 flex items-center justify-center font-semibold text-gray-700">
             Habitaciones
           </div>
-          {/* Lista de habitaciones - se mueve con el scroll vertical del contenedor principal */}
-          {rooms.map((room, rowIndex) => (
-            <div
-              key={room.id || rowIndex}
-              className="border-b border-gray-200 bg-white h-20 flex items-center p-2 font-semibold text-gray-700 text-sm"
-            >
-              {room.name}
-            </div>
-          ))}
+          {/* Lista de habitaciones virtualizadas */}
+          <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const room = rooms[virtualRow.index];
+              return (
+                <div
+                  key={room.id || virtualRow.index}
+                  className="border-b border-gray-200 bg-white flex items-center p-2 font-semibold text-gray-700 text-sm"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: `${virtualRow.size}px`,
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
+                  {room.name}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* Área scrollable de días (solo scroll horizontal, el vertical viene del padre) */}
@@ -82,11 +122,11 @@ export const CalendarTable = ({
           style={{ 
             whiteSpace: "nowrap", 
             overflowY: 'hidden',
-            height: `${totalHeight}px`
+            height: `${rowVirtualizer.getTotalSize() + 80}px`
           }}
         >
-          <div className="inline-block min-w-max" style={{ height: `${totalHeight}px` }}>
-            {/* Header row - sticky top para que no se mueva con scroll vertical */}
+          <div className="inline-block min-w-max" style={{ height: `${rowVirtualizer.getTotalSize() + 80}px`, position: 'relative' }}>
+            {/* Header row - sticky top */}
             <div className={`sticky top-0 z-30 bg-linear-to-r from-blue-50 to-indigo-50 border-b-2 border-gray-300`} style={{ width: `${columnVirtualizer.getTotalSize()}px`, position: 'relative', height: '80px' }}>
             {columnVirtualizer.getVirtualItems().map((virtualColumn) => {
               const day = allDays[virtualColumn.index];
@@ -115,13 +155,25 @@ export const CalendarTable = ({
             })}
           </div>
 
-          {/* Body rows - solo celdas de días */}
-          {rooms.map((room, rowIndex) => (
-            <div
-              key={room.id || rowIndex}
-              className="border-b border-gray-100 bg-white h-20 overflow-hidden"
-              style={{ width: `${columnVirtualizer.getTotalSize()}px`, position: 'relative' }}
-            >
+          {/* Body rows - virtualizadas verticalmente */}
+          <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const room = rooms[virtualRow.index];
+              const rowIndex = virtualRow.index;
+              
+              return (
+                <div
+                  key={room.id || rowIndex}
+                  className="border-b border-gray-100 bg-white overflow-hidden"
+                  style={{ 
+                    width: `${columnVirtualizer.getTotalSize()}px`, 
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    height: `${virtualRow.size}px`,
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
               {/* Renderizar celdas */}
               {columnVirtualizer.getVirtualItems().map((virtualColumn) => {
                 const dayIndex = virtualColumn.index;
@@ -226,8 +278,10 @@ export const CalendarTable = ({
                   </div>
                 );
               })}
-            </div>
-          ))}
+                </div>
+              );
+            })}
+          </div>
           </div>
         </div>
       </div>
