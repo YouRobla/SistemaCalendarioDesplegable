@@ -9,11 +9,12 @@ import {
 import { YearlyScrollableCalendar } from './Components/YearlyScrollableCalendar'
 
 function App() {
-  const queryClient = new QueryClient()
+  const queryClient = new QueryClient({  })
+
   return (
     <QueryClientProvider client={queryClient}>
       <YearlyScrollableCalendar />
-  </QueryClientProvider>
+    </QueryClientProvider>
   )
 }
 

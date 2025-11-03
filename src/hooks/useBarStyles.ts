@@ -9,15 +9,6 @@ interface Bar {
 
 export const useBarStyles = () => {
   const [, trigger] = useState({});
-  const lastFrameRef = useRef<number>(0);
-
-  const forceRender = useCallback(() => {
-    const now = performance.now();
-    if (now - lastFrameRef.current < 16) return;
-    lastFrameRef.current = now;
-    trigger({});
-  }, []);
-
   const barsByRoom = useRef<Map<number, Bar[]>>(new Map());
   const selectionRef = useRef({
     active: false,
@@ -26,21 +17,48 @@ export const useBarStyles = () => {
     end: null as number | null,
   });
 
-  const classCache = useRef<Map<string, string>>(new Map());
+  const forceRender = useCallback(() => {
+    requestAnimationFrame(() => trigger({}));
+  }, []);
 
+  // ✅ NUEVA FUNCIÓN: Verificar si una celda está bloqueada
+  const isCellBlocked = useCallback((room: number, day: number): boolean => {
+    const bars = barsByRoom.current.get(room) || [];
+    return bars.some(bar => day >= bar.start && day <= bar.end);
+  }, []);
+
+  // ✅ MODIFICADO: Verificar si se puede iniciar selección
   const startSelection = useCallback((room: number, day: number) => {
+    // No permitir iniciar en celda bloqueada
+    if (isCellBlocked(room, day)) {
+      return;
+    }
+    
     selectionRef.current = { active: true, room, start: day, end: day };
-    classCache.current.clear();
     forceRender();
-  }, [forceRender]);
+  }, [forceRender, isCellBlocked]);
 
+  // ✅ MODIFICADO: No permitir extender sobre celdas bloqueadas
   const updateSelection = useCallback((room: number, day: number) => {
     const s = selectionRef.current;
     if (!s.active || s.room !== room) return;
+    if (s.end === day) return;
+    
+    // Verificar si el rango contiene celdas bloqueadas
+    const start = Math.min(s.start!, day);
+    const end = Math.max(s.start!, day);
+    
+    // Verificar cada día en el rango
+    for (let d = start; d <= end; d++) {
+      if (isCellBlocked(room, d)) {
+        // Si encuentra una celda bloqueada, cancelar la selección
+        return;
+      }
+    }
+    
     s.end = day;
-    classCache.current.clear();
     forceRender();
-  }, [forceRender]);
+  }, [forceRender, isCellBlocked]);
 
   const endSelection = useCallback(() => {
     const s = selectionRef.current;
@@ -54,21 +72,29 @@ export const useBarStyles = () => {
     const start = Math.min(s.start, s.end);
     const end = Math.max(s.start, s.end);
 
+    // ✅ Verificación final antes de crear la barra
+    for (let d = start; d <= end; d++) {
+      if (isCellBlocked(s.room, d)) {
+        // Si hay celdas bloqueadas, cancelar
+        selectionRef.current = { active: false, room: null, start: null, end: null };
+        forceRender();
+        return;
+      }
+    }
+
     const newBar: Bar = {
-      id: `bar-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      id: `${Date.now()}-${Math.random().toString(36).substring(7)}`,
       room: s.room,
       start,
       end,
     };
 
     const roomBars = barsByRoom.current.get(s.room) || [];
-    roomBars.push(newBar);
-    barsByRoom.current.set(s.room, roomBars);
+    barsByRoom.current.set(s.room, [...roomBars, newBar]);
 
     selectionRef.current = { active: false, room: null, start: null, end: null };
-    classCache.current.clear();
-    requestAnimationFrame(() => forceRender());
-  }, [forceRender]);
+    forceRender();
+  }, [forceRender, isCellBlocked]);
 
   useEffect(() => {
     const handleMouseUp = () => {
@@ -76,62 +102,27 @@ export const useBarStyles = () => {
         endSelection();
       }
     };
-
     document.addEventListener('mouseup', handleMouseUp);
     return () => document.removeEventListener('mouseup', handleMouseUp);
   }, [endSelection]);
 
-  const getBarPosition = useCallback((room: number, day: number) => {
-    const s = selectionRef.current;
-
-    // Barra en selección activa
-    if (s.active && s.room === room && s.start !== null && s.end !== null) {
-      const start = Math.min(s.start, s.end);
-      const end = Math.max(s.start, s.end);
-      if (day >= start && day <= end) {
-        if (start === end) return "single";
-        if (day === start) return "head";
-        if (day === end) return "tail";
-        return "body";
-      }
-    }
-
-    // Barras persistentes
-    const bars = barsByRoom.current.get(room) || [];
-    const bar = bars.find((b) => day >= b.start && day <= b.end);
-    if (!bar) return null;
-
-    if (bar.start === bar.end) return "single";
-    if (day === bar.start) return "head";
-    if (day === bar.end) return "tail";
-    return "body";
-  }, []);
-
+  // ✅ MODIFICADO: getCellClasses con estado bloqueado
   const getCellClasses = useCallback((room: number, day: number) => {
-    const key = `${room}-${day}`;
-    if (classCache.current.has(key)) return classCache.current.get(key);
-
-    const base = "relative h-20 select-none transition-all duration-150";
-    const barPosition = getBarPosition(room, day);
     const s = selectionRef.current;
-    
-    const isInActiveSelection = s.active && s.room === room && 
-      s.start !== null && s.end !== null &&
-      day >= Math.min(s.start, s.end) && day <= Math.max(s.start, s.end);
-    
-    // Obtener todas las barras que afectan este día
     const bars = barsByRoom.current.get(room) || [];
     
-    // Encontrar si este día está dentro de una barra (no en los extremos)
+    // Verificar si está bloqueada (tiene una barra persistente)
+    const isBlocked = bars.some(b => day >= b.start && day <= b.end);
+    
+    // Verificar posición en barras
     let isInsideBar = false;
     let isBarStart = false;
     let isBarEnd = false;
     
-    // Verificar barras persistentes
-    bars.forEach(b => {
+    // Solo verificar barras persistentes para los estilos
+    for (const b of bars) {
       if (day >= b.start && day <= b.end) {
-        if (day === b.start && day === b.end) {
-          // Barra de un solo día
+        if (b.start === b.end) {
           isBarStart = true;
           isBarEnd = true;
         } else if (day === b.start) {
@@ -141,15 +132,25 @@ export const useBarStyles = () => {
         } else {
           isInsideBar = true;
         }
+        break;
       }
-    });
+    }
     
-    // Verificar selección activa
-    if (isInActiveSelection && s.start !== null && s.end !== null) {
-      const start = Math.min(s.start, s.end);
-      const end = Math.max(s.start, s.end);
+    // Verificar selección activa (solo si no está bloqueada)
+    const isInActiveSelection = !isBlocked && 
+      s.active && 
+      s.room === room && 
+      s.start !== null && 
+      s.end !== null &&
+      day >= Math.min(s.start, s.end) && 
+      day <= Math.max(s.start, s.end);
+    
+    if (isInActiveSelection) {
+      const start = Math.min(s.start!, s.end!);
+      const end = Math.max(s.start!, s.end!);
+      
       if (day >= start && day <= end) {
-        if (day === start && day === end) {
+        if (start === end) {
           isBarStart = true;
           isBarEnd = true;
         } else if (day === start) {
@@ -162,57 +163,63 @@ export const useBarStyles = () => {
       }
     }
     
-    // Si está dentro de una barra (no en extremos), ocultar todos los bordes verticales
-    let borderClasses = '';
+    // Calcular bordes
+    let borderClasses;
     if (isInsideBar) {
-      // Dentro de la barra: sin bordes verticales, solo top y bottom
       borderClasses = 'border-t border-b border-gray-100';
     } else if (isBarStart && !isBarEnd) {
-      // Inicio de barra: mostrar borde izquierdo, ocultar derecho
       borderClasses = 'border-l border-t border-b border-gray-100';
     } else if (isBarEnd && !isBarStart) {
-      // Fin de barra: mostrar borde derecho, ocultar izquierdo
       borderClasses = 'border-r border-t border-b border-gray-100';
     } else {
-      // Sin barra o barra de un solo día: todos los bordes
       borderClasses = 'border border-gray-100';
     }
     
-    let value;
-    if (barPosition && !isInActiveSelection) {
-      // Celda ocupada
-      value = `${base} bg-white ${borderClasses} cursor-pointer`;
-    } else {
-      // Celda libre
-      value = `${base} bg-white ${borderClasses} hover:bg-blue-50/40 hover:border-blue-200 cursor-crosshair`;
+    // ✅ NUEVO: Estilos para celdas bloqueadas
+    if (isBlocked) {
+      return `relative h-20 select-none bg-gray-100 ${borderClasses} cursor-not-allowed opacity-60`;
     }
     
-    classCache.current.set(key, value);
-    return value;
-  }, [getBarPosition]);
+    // Celdas libres
+    const hoverClasses = isInActiveSelection
+      ? 'cursor-pointer' 
+      : 'hover:bg-blue-50/40 hover:border-blue-200 cursor-crosshair';
+    
+    return `relative h-20 select-none transition-all duration-150 bg-white ${borderClasses} ${hoverClasses}`;
+  }, []);
 
-  // Obtener todas las barras completas de una habitación
   const getBarsForRoom = useCallback((room: number) => {
     const s = selectionRef.current;
     const bars: Array<{ start: number; end: number; isActive: boolean }> = [];
     
-    // Barras persistentes
+    // Barras persistentes (bloqueadas)
     const roomBars = barsByRoom.current.get(room) || [];
-    roomBars.forEach(bar => {
-      bars.push({
-        start: bar.start,
-        end: bar.end,
-        isActive: false,
-      });
-    });
+    for (const bar of roomBars) {
+      bars.push({ start: bar.start, end: bar.end, isActive: false });
+    }
     
-    // Barra de selección activa
+    // Selección activa (solo si no hay celdas bloqueadas en el rango)
     if (s.active && s.room === room && s.start !== null && s.end !== null) {
-      bars.push({
-        start: Math.min(s.start, s.end),
-        end: Math.max(s.start, s.end),
-        isActive: true,
-      });
+      const start = Math.min(s.start, s.end);
+      const end = Math.max(s.start, s.end);
+      
+      // Verificar que no haya celdas bloqueadas
+      let hasBlocked = false;
+      for (let d = start; d <= end; d++) {
+        if (roomBars.some(b => d >= b.start && d <= b.end)) {
+          hasBlocked = true;
+          break;
+        }
+      }
+      
+      // Solo agregar si no hay bloqueos
+      if (!hasBlocked) {
+        bars.push({
+          start,
+          end,
+          isActive: true,
+        });
+      }
     }
     
     return bars;
@@ -224,5 +231,6 @@ export const useBarStyles = () => {
     startSelection,
     updateSelection,
     endSelection,
+    isCellBlocked, // ✅ Exportar por si lo necesitas
   };
 };

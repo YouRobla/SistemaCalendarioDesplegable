@@ -1,10 +1,11 @@
-import { type RefObject, useRef, useEffect } from "react";
+import { useRef, useEffect, useMemo, type RefObject } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { DayHeaderCell } from "../DayHeaderCell";
 import { DaysCalendar } from "../DaysCalendar";
-import type { CalendarDay } from "../../utils/calendarHelpers";
 import { useBarStyles } from "../../hooks/useBarStyles";
+import type { CalendarDay } from "../../utils/calendarHelpers";
 import type { HotelRoom } from "../../api/HotelRooms";
+import { useCallback } from "react";
 
 interface CalendarTableProps {
   containerRef: RefObject<HTMLDivElement | null>;
@@ -13,99 +14,171 @@ interface CalendarTableProps {
   rooms: HotelRoom[];
 }
 
+const ROW_HEIGHT = 80;
+const HEADER_HEIGHT = 80;
+
 export const CalendarTable = ({
   containerRef,
   allDays,
   today,
   rooms,
 }: CalendarTableProps) => {
-  const { 
-    getCellClasses, 
-    getBarsForRoom,
-    startSelection, 
-    updateSelection, 
-    endSelection
-  } = useBarStyles();
+  const { getCellClasses, getBarsForRoom, startSelection, updateSelection, endSelection } =
+    useBarStyles();
 
-  const COLUMN_WIDTH = 85;
+  const mainScrollRef = useRef<HTMLDivElement>(null);
+  const roomsColumnRef = useRef<HTMLDivElement>(null);
+  const syncingRef = useRef(false);
 
-  // Siempre habilitar scroll vertical si hay múltiples habitaciones
-  // Calcular altura total: header (80px) + (número de habitaciones * 80px)
-  const totalHeight = 80 + (rooms.length * 80); // Header + filas
-  const maxVisibleHeight = Math.min(totalHeight, window.innerHeight * 0.7); // Máximo 70vh
-  const needsVerticalScroll = totalHeight > maxVisibleHeight;
+  // Memoizar cálculos de altura
+  const heightConfig = useMemo(() => {
+    const totalHeight = HEADER_HEIGHT + rooms.length * ROW_HEIGHT;
+    const maxVisibleHeight = Math.min(totalHeight, window.innerHeight * 0.7);
+    const needsScroll = totalHeight > maxVisibleHeight;
+    const contentHeight = needsScroll 
+      ? maxVisibleHeight - HEADER_HEIGHT 
+      : rooms.length * ROW_HEIGHT;
+    
+    return { totalHeight, maxVisibleHeight, needsScroll, contentHeight };
+  }, [rooms.length]);
 
-  // Ref para el contenedor de scroll vertical
-  const verticalScrollRef = useRef<HTMLDivElement>(null);
+  // Scroll horizontal sincronizado (encabezado ↔ contenido)
+  useEffect(() => {
+    const header = containerRef.current;
+    const main = mainScrollRef.current;
+    if (!header || !main) return;
 
-  // Virtualización horizontal de columnas (días)
+    const syncScroll = (e: Event) => {
+      if (syncingRef.current) return;
+      const source = e.target as HTMLElement;
+      const target = source === header ? main : header;
+      
+      syncingRef.current = true;
+      target.scrollLeft = source.scrollLeft;
+      requestAnimationFrame(() => {
+        syncingRef.current = false;
+      });
+    };
+
+    header.addEventListener("scroll", syncScroll, { passive: true });
+    main.addEventListener("scroll", syncScroll, { passive: true });
+    main.scrollLeft = header.scrollLeft;
+
+    return () => {
+      header.removeEventListener("scroll", syncScroll);
+      main.removeEventListener("scroll", syncScroll);
+    };
+  }, [containerRef]);
+
+  // Scroll vertical sincronizado (habitaciones ↔ contenido)
+  useEffect(() => {
+    const main = mainScrollRef.current;
+    const roomsCol = roomsColumnRef.current;
+    if (!main || !roomsCol) return;
+
+    const syncScroll = (e: Event) => {
+      if (syncingRef.current) return;
+      const source = e.target as HTMLElement;
+      const target = source === main ? roomsCol : main;
+      
+      syncingRef.current = true;
+      target.scrollTop = source.scrollTop;
+      requestAnimationFrame(() => {
+        syncingRef.current = false;
+      });
+    };
+
+    main.addEventListener("scroll", syncScroll, { passive: true });
+    roomsCol.addEventListener("scroll", syncScroll, { passive: true });
+
+    return () => {
+      main.removeEventListener("scroll", syncScroll);
+      roomsCol.removeEventListener("scroll", syncScroll);
+    };
+  }, []);
+
+  // Virtualizadores
   const columnVirtualizer = useVirtualizer({
     count: allDays.length,
-    getScrollElement: () => containerRef.current,
+    getScrollElement: () => mainScrollRef.current,
     estimateSize: () => 85,
     horizontal: true,
     overscan: 3,
   });
 
-  // Virtualización vertical de filas (habitaciones)
   const rowVirtualizer = useVirtualizer({
     count: rooms.length,
-    getScrollElement: () => verticalScrollRef.current,
-    estimateSize: () => 80,
+    getScrollElement: () => mainScrollRef.current,
+    estimateSize: () => ROW_HEIGHT,
     overscan: 2,
   });
 
-  // Log para verificar virtualización
-  useEffect(() => {
-    const visibleRows = rowVirtualizer.getVirtualItems().length;
-    const visibleCols = columnVirtualizer.getVirtualItems().length;
-    const totalCells = visibleRows * visibleCols;
-    const totalPossibleCells = rooms.length * allDays.length;
-    const reduction = ((1 - totalCells / totalPossibleCells) * 100).toFixed(1);
-    
-    console.log(`🚀 Virtualización activa:`);
-    console.log(`  📊 Filas visibles: ${visibleRows} de ${rooms.length} habitaciones`);
-    console.log(`  📊 Columnas visibles: ${visibleCols} de ${allDays.length} días`);
-    console.log(`  📊 Celdas renderizadas: ${totalCells} de ${totalPossibleCells} posibles`);
-    console.log(`  ✅ Reducción de renderizado: ${reduction}%`);
-  }, [rooms.length, allDays.length, rowVirtualizer, columnVirtualizer]);
+  // Items virtuales
+  const virtualColumns = columnVirtualizer.getVirtualItems();
+  const virtualRows = rowVirtualizer.getVirtualItems();
+
+  // Mapa de posiciones de columnas
+  const columnPositions = useMemo(() => {
+    const map = new Map<number, { start: number; size: number }>();
+    virtualColumns.forEach(col => {
+      map.set(col.index, { start: col.start, size: col.size });
+    });
+    return map;
+  }, [virtualColumns]);
+
+
+  const handleCellInteraction = useCallback((
+    type: 'down' | 'enter' | 'up',
+    room: number,
+    day: number,
+    buttons?: number
+  ) => {
+    switch (type) {
+      case 'down':
+        startSelection(room, day);
+        break;
+      case 'enter':
+        if (buttons === 1) updateSelection(room, day);
+        break;
+      case 'up':
+        endSelection();
+        break;
+    }
+  }, [startSelection, updateSelection, endSelection]);
+
 
   return (
-    <div 
-      ref={verticalScrollRef}
-      className="rounded-2xl border border-gray-100 bg-white shadow-lg flex flex-col"
-      style={{ 
-        maxHeight: needsVerticalScroll ? `${maxVisibleHeight}px` : 'none',
-        overflowY: needsVerticalScroll ? 'auto' : 'visible',
-        overflowX: 'hidden',
-      }}
-    >
-      {/* Contenedor principal con scroll vertical compartido */}
-      <div className="flex shrink-0" style={{ height: `${rowVirtualizer.getTotalSize() + 80}px`, position: 'relative' }}>
-        {/* Columna fija de Habitaciones (virtualizada verticalmente) */}
+    <div className="flex rounded-2xl border border-gray-100 shadow-lg overflow-hidden">
+      {/* Columna de Habitaciones */}
+      <div className="flex flex-col w-[150px] border-r border-gray-200 bg-gray-50">
+        <div className="h-20 flex items-center justify-center font-semibold text-gray-700 border-b-2 border-gray-300 bg-gray-50 flex-shrink-0">
+          Habitaciones
+        </div>
+
         <div 
-          className="shrink-0 border-r border-gray-200 bg-gray-50 sticky left-0"
-          style={{ width: '150px', height: `${rowVirtualizer.getTotalSize() + 80}px` }}
+          ref={roomsColumnRef} 
+          className="overflow-y-scroll overflow-x-hidden scrollbar-thin flex-1"
+          style={{ 
+            height: `${heightConfig.contentHeight}px`,
+            scrollbarGutter: 'stable'
+          }}
         >
-          {/* Header de Habitaciones - sticky */}
-          <div className="sticky top-0 z-40 bg-gray-50 border-b border-gray-200 h-20 flex items-center justify-center font-semibold text-gray-700">
-            Habitaciones
-          </div>
-          {/* Lista de habitaciones virtualizadas */}
-          <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
-            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-              const room = rooms[virtualRow.index];
+          <div style={{ 
+            height: `${rowVirtualizer.getTotalSize()}px`, 
+            position: 'relative',
+            width: '100%'
+          }}>
+            {virtualRows.map((vRow) => {
+              const room = rooms[vRow.index];
+              if (!room) return null;
+              
               return (
                 <div
-                  key={room.id || virtualRow.index}
-                  className="border-b border-gray-200 bg-white flex items-center p-2 font-semibold text-gray-700 text-sm"
+                  key={room.id}
+                  className="absolute w-full border-b border-gray-200 flex items-center px-3 font-semibold text-gray-700 text-sm bg-white"
                   style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: `${virtualRow.size}px`,
-                    transform: `translateY(${virtualRow.start}px)`,
+                    height: `${ROW_HEIGHT}px`,
+                    transform: `translateY(${vRow.start}px)`,
                   }}
                 >
                   {room.name}
@@ -114,174 +187,128 @@ export const CalendarTable = ({
             })}
           </div>
         </div>
+      </div>
 
-        {/* Área scrollable de días (solo scroll horizontal, el vertical viene del padre) */}
+      {/* Calendario Principal */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Encabezado de Días */}
+        <div className="h-20 border-b-2 border-gray-300 bg-gradient-to-r from-blue-50 to-indigo-50 flex-shrink-0">
+          <div ref={containerRef} className="overflow-x-scroll overflow-y-hidden h-full scrollbar-thin">
+            <div style={{ 
+              width: `${columnVirtualizer.getTotalSize()}px`, 
+              height: '100%', 
+              position: 'relative' 
+            }}>
+              {virtualColumns.map((vCol) => (
+                <div
+                  key={vCol.index}
+                  className="absolute top-0"
+                  style={{
+                    width: `${vCol.size}px`,
+                    height: `${HEADER_HEIGHT}px`,
+                    transform: `translateX(${vCol.start}px)`,
+                  }}
+                >
+                  <DayHeaderCell {...allDays[vCol.index]} today={today} index={vCol.index} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Cuerpo del Calendario */}
         <div
-          ref={containerRef}
-          className="flex-1 overflow-x-auto"
+          ref={mainScrollRef}
+          className="overflow-scroll scrollbar-thin flex-1"
           style={{ 
-            whiteSpace: "nowrap", 
-            overflowY: 'hidden',
-            height: `${rowVirtualizer.getTotalSize() + 80}px`
+            height: `${heightConfig.contentHeight}px`,
+            scrollbarGutter: 'stable'
           }}
         >
-          <div className="inline-block min-w-max" style={{ height: `${rowVirtualizer.getTotalSize() + 80}px`, position: 'relative' }}>
-            {/* Header row - sticky top */}
-            <div className={`sticky top-0 z-30 bg-linear-to-r from-blue-50 to-indigo-50 border-b-2 border-gray-300`} style={{ width: `${columnVirtualizer.getTotalSize()}px`, position: 'relative', height: '80px' }}>
-            {columnVirtualizer.getVirtualItems().map((virtualColumn) => {
-              const day = allDays[virtualColumn.index];
+          <div
+            style={{
+              width: `${columnVirtualizer.getTotalSize()}px`,
+              height: `${rowVirtualizer.getTotalSize()}px`,
+              position: 'relative',
+            }}
+          >
+            {virtualRows.map((vRow) => {
+              const room = rooms[vRow.index];
+              const bars = getBarsForRoom(vRow.index);
+              
               return (
                 <div
-                  key={virtualColumn.index}
+                  key={room.id}
+                  className="absolute border-b border-gray-100"
                   style={{
-                    position: 'absolute',
-                    left: 0,
-                    top: 0,
-                    width: `${virtualColumn.size}px`,
-                    transform: `translateX(${virtualColumn.start}px)`,
+                    height: `${ROW_HEIGHT}px`,
+                    width: '100%',
+                    transform: `translateY(${vRow.start}px)`,
                   }}
                 >
-                  <DayHeaderCell
-                    index={virtualColumn.index}
-                    day={day.day}
-                    weekday={day.weekday}
-                    month={day.month}
-                    monthName={day.monthName}
-                    year={day.year}
-                    today={today}
-                  />
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Body rows - virtualizadas verticalmente */}
-          <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
-            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-              const room = rooms[virtualRow.index];
-              const rowIndex = virtualRow.index;
-              
-              return (
-                <div
-                  key={room.id || rowIndex}
-                  className="border-b border-gray-100 bg-white overflow-hidden"
-                  style={{ 
-                    width: `${columnVirtualizer.getTotalSize()}px`, 
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    height: `${virtualRow.size}px`,
-                    transform: `translateY(${virtualRow.start}px)`,
-                  }}
-                >
-              {/* Renderizar celdas */}
-              {columnVirtualizer.getVirtualItems().map((virtualColumn) => {
-                const dayIndex = virtualColumn.index;
-                return (
-                  <div
-                    key={`${room.id || rowIndex}-${dayIndex}`}
-                    className="absolute left-0 top-0 will-change-transform"
-                    style={{
-                      width: `${virtualColumn.size}px`,
-                      transform: `translateX(${virtualColumn.start}px)`,
-                    }}
-                  >
-                    <div style={{ height: '80px' }}>
-                      <DaysCalendar
-                        rowIndex={rowIndex}
-                        dayIndex={dayIndex}
-                        cellClasses={getCellClasses(rowIndex, dayIndex) || ''}
-                        onMouseDown={startSelection}
-                        onMouseEnter={updateSelection}
-                        onMouseUp={endSelection}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-              
-              {/* Renderizar barras continuas sobre las celdas */}
-              {getBarsForRoom(rowIndex).map((bar, barIndex) => {
-                const visibleItems = columnVirtualizer.getVirtualItems();
-                if (visibleItems.length === 0) return null;
-                
-                const visibleStartIndex = visibleItems[0].index;
-                const visibleEndIndex = visibleItems[visibleItems.length - 1].index;
-                
-                // Verificar si la barra intersecta con las columnas visibles
-                if (bar.end < visibleStartIndex || bar.start > visibleEndIndex) {
-                  return null;
-                }
-                
-                // Calcular la posición de inicio
-                let startPos: number;
-                const startVirtual = visibleItems.find(v => v.index === bar.start);
-                if (startVirtual) {
-                  startPos = startVirtual.start;
-                } else if (bar.start < visibleStartIndex) {
-                  startPos = visibleItems[0].start;
-                } else {
-                  startPos = (bar.start - visibleStartIndex) * COLUMN_WIDTH + visibleItems[0].start;
-                }
-                
-                // Calcular la posición de fin
-                let endPos: number;
-                const endVirtual = visibleItems.find(v => v.index === bar.end);
-                if (endVirtual) {
-                  endPos = endVirtual.start + endVirtual.size;
-                } else if (bar.end > visibleEndIndex) {
-                  const lastVisible = visibleItems[visibleItems.length - 1];
-                  endPos = lastVisible.start + lastVisible.size;
-                } else {
-                  endPos = ((bar.end - visibleStartIndex + 1) * COLUMN_WIDTH) + visibleItems[0].start;
-                }
-                
-                const barWidth = endPos - startPos;
-                
-                return (
-                  <div
-                    key={`bar-${rowIndex}-${bar.start}-${bar.end}-${barIndex}`}
-                    className="absolute top-0 bottom-0 z-30 flex items-center pointer-events-none"
-                    style={{
-                      left: `${startPos}px`,
-                      width: `${barWidth}px`,
-                      height: '80px',
-                      outline: 'none',
-                      border: 'none',
-                      boxShadow: 'none',
-                    }}
-                  >
+                  {/* Celdas */}
+                  {virtualColumns.map((vCol) => (
                     <div
-                      className={`absolute left-2 right-2 top-6 bottom-6 rounded-xl transition-all duration-150 pointer-events-auto ${
-                        bar.isActive 
-                          ? 'bg-blue-500 shadow-lg' 
-                          : 'bg-green-500 shadow-md hover:shadow-lg hover:bg-green-600'
-                      }`}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        startSelection(rowIndex, bar.start);
-                      }}
-                      onMouseEnter={(e) => {
-                        if (e.buttons === 1) {
-                          updateSelection(rowIndex, bar.end);
-                        }
-                      }}
-                      onMouseUp={endSelection}
+                      key={`${room.id}-${vCol.index}`}
+                      className="absolute"
                       style={{
-                        cursor: 'pointer',
-                        outline: 'none',
-                        border: 'none',
-                        boxShadow: 'none',
+                        width: `${vCol.size}px`,
+                        height: `${ROW_HEIGHT}px`,
+                        transform: `translateX(${vCol.start}px)`,
                       }}
-                    />
-                  </div>
-                );
-              })}
+                    >
+    <DaysCalendar
+            rowIndex={vRow.index}
+            dayIndex={vCol.index}
+            cellClasses={getCellClasses(vRow.index, vCol.index) || ""}
+            onMouseDown={startSelection}
+            onMouseEnter={updateSelection}
+            onMouseUp={endSelection}
+          />
+                    </div>
+                  ))}
+
+                  {/* Barras de Selección */}
+                  {bars.map((bar, i) => {
+                    const startCol = columnPositions.get(bar.start);
+                    const endCol = columnPositions.get(bar.end);
+                    if (!startCol || !endCol) return null;
+
+                    const left = startCol.start;
+                    const width = endCol.start + endCol.size - startCol.start;
+
+                    return (
+                      <div
+                        key={`bar-${i}`}
+                        className="absolute z-30"
+                        style={{
+                          left: `${left}px`,
+                          width: `${width}px`,
+                          height: `${ROW_HEIGHT}px`,
+                        }}
+                      >
+                        <div
+                          className={`absolute inset-2 my-6 rounded-xl transition-all duration-150 cursor-pointer ${
+                            bar.isActive
+                              ? "bg-blue-500 shadow-lg"
+                              : "bg-green-500 shadow-md hover:bg-green-600 hover:shadow-lg"
+                          }`}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            startSelection(vRow.index, bar.start);
+                          }}
+                          onMouseEnter={(e) =>
+                            e.buttons === 1 && updateSelection(vRow.index, bar.end)
+                          }
+                          onMouseUp={endSelection}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}
-          </div>
           </div>
         </div>
       </div>

@@ -17,33 +17,22 @@ export const DaysCalendar = memo(function DaysCalendar({
   onMouseEnter,
   onMouseUp,
 }: DaysCalendarProps) {
-  const handleMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    onMouseDown(rowIndex, dayIndex);
-  };
-
-  const handleMouseEnter = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (event.buttons === 1) {
-      onMouseEnter(rowIndex, dayIndex);
-    }
-  };
-
   return (
     <div
-      className={cellClasses}
-      onMouseDown={handleMouseDown}
-      onMouseEnter={handleMouseEnter}
-      onMouseUp={onMouseUp}
-      style={{
-        outline: 'none',
-        boxShadow: 'none',
+      className={cellClasses} 
+      onMouseDown={(e) => {
+        e.preventDefault();
+        onMouseDown(rowIndex, dayIndex);
       }}
+      onMouseEnter={(e) => {
+        if (e.buttons === 1) {
+          onMouseEnter(rowIndex, dayIndex);
+        }
+      }}
+      onMouseUp={onMouseUp}
     />
   );
-}, (prevProps, nextProps) => {
-  return (
-    prevProps.rowIndex === nextProps.rowIndex &&
-    prevProps.dayIndex === nextProps.dayIndex &&
-    prevProps.cellClasses === nextProps.cellClasses
-  );
 });
+
+// ✅ Comparación correcta que IGNORA las funciones
+DaysCalendar.displayName = 'DaysCalendar';

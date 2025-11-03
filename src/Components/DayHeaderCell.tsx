@@ -39,7 +39,7 @@ export const DayHeaderCell = memo(function DayHeaderCell({
   return (
     <div
       key={index}
-      className={`p-3 min-w-[85px] h-20 transition-colors duration-150 ${bgClass} ${monthStartClass} ${!isToday ? 'hover:bg-blue-100' : ''} ${isToday ? 'hover:from-blue-600 hover:to-indigo-700' : ''} overflow-hidden flex flex-col justify-center items-center text-center`}
+      className={`p-3 min-w-[85px]  transition-colors duration-150 h-16 ${bgClass} ${monthStartClass} ${!isToday ? 'hover:bg-blue-100' : ''} ${isToday ? 'hover:from-blue-600 hover:to-indigo-700' : ''} overflow-hidden flex flex-col justify-center items-center text-center`}
       title={`${day} ${monthName} ${year}`}
     >
       <div className={`font-medium flex flex-col items-center justify-center ${isToday ? 'text-white' : 'text-gray-700'}`}>
